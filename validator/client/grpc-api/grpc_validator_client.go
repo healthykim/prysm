@@ -94,16 +94,17 @@ func toValidatorDuty(duty *ethpb.DutiesResponse_Duty) (*ethpb.ValidatorDuty, err
 		}
 	}
 	return &ethpb.ValidatorDuty{
-		CommitteeLength:         uint64(len(duty.Committee)),
-		CommitteeIndex:          duty.CommitteeIndex,
-		CommitteesAtSlot:        duty.CommitteesAtSlot, // GRPC doesn't use this value though
-		ValidatorCommitteeIndex: valIndexInCommittee,
-		AttesterSlot:            duty.AttesterSlot,
-		ProposerSlots:           duty.ProposerSlots,
-		PublicKey:               bytesutil.SafeCopyBytes(duty.PublicKey),
-		Status:                  duty.Status,
-		ValidatorIndex:          duty.ValidatorIndex,
-		IsSyncCommittee:         duty.IsSyncCommittee,
+		CommitteeLength:            uint64(len(duty.Committee)),
+		CommitteeIndex:             duty.CommitteeIndex,
+		CommitteesAtSlot:           duty.CommitteesAtSlot, // GRPC doesn't use this value though
+		ValidatorCommitteeIndex:    valIndexInCommittee,
+		AttesterSlot:               duty.AttesterSlot,
+		ProposerSlots:              duty.ProposerSlots,
+		PublicKey:                  bytesutil.SafeCopyBytes(duty.PublicKey),
+		Status:                     duty.Status,
+		ValidatorIndex:             duty.ValidatorIndex,
+		IsSyncCommittee:            duty.IsSyncCommittee,
+		InclusionListCommitteeSlot: duty.InclusionListCommitteeSlot,
 	}, nil
 }
 
@@ -382,4 +383,12 @@ func (*grpcValidatorClient) Host() string {
 
 func (*grpcValidatorClient) SetHost(_ string) {
 	log.Warn(iface.ErrNotSupported)
+}
+
+func (c *grpcValidatorClient) GetInclusionList(request *ethpb.GetInclusionListRequest) (*ethpb.InclusionList, error) {
+	return c.beaconNodeValidatorClient.GetInclusionList(context.Background(), request)
+}
+
+func (c *grpcValidatorClient) SubmitInclusionList(il *ethpb.SignedInclusionList) (*empty.Empty, error) {
+	return c.beaconNodeValidatorClient.SubmitInclusionList(context.Background(), il)
 }

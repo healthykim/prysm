@@ -118,6 +118,7 @@ func operationEventsFixtures(t *testing.T) (*topicRequest, []*feed.Event) {
 		SyncCommitteeContributionTopic,
 		BLSToExecutionChangeTopic,
 		BlobSidecarTopic,
+		InclusionListTopic,
 		AttesterSlashingTopic,
 		ProposerSlashingTopic,
 		BlockGossipTopic,
@@ -204,6 +205,20 @@ func operationEventsFixtures(t *testing.T) (*topicRequest, []*feed.Event) {
 			Type: operation.BlobSidecarReceived,
 			Data: &operation.BlobSidecarReceivedData{
 				Blob: &vblob,
+			},
+		},
+		{
+			Type: operation.InclusionListReceived,
+			Data: &operation.InclusionListReceivedData{
+				SignedInclusionList: &eth.SignedInclusionList{
+					Message: &eth.InclusionList{
+						Slot:                       0,
+						ValidatorIndex:             0,
+						InclusionListCommitteeRoot: make([]byte, fieldparams.RootLength),
+						Transactions:               [][]byte{},
+					},
+					Signature: make([]byte, fieldparams.BLSSignatureLength),
+				},
 			},
 		},
 		{
@@ -709,7 +724,7 @@ func TestStuckReaderScenarios(t *testing.T) {
 
 func wedgedWriterTestCase(t *testing.T, queueDepth func([]*feed.Event) int) {
 	topics, events := operationEventsFixtures(t)
-	require.Equal(t, 11, len(events))
+	require.Equal(t, 12, len(events))
 
 	// set eventFeedDepth to a number lower than the events we intend to send to force the server to drop the reader.
 	stn := mockChain.NewEventFeedWrapper()

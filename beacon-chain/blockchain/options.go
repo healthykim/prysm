@@ -258,3 +258,10 @@ func WithLightClientStore(lcs *lightclient.Store) Option {
 		return nil
 	}
 }
+
+func WithInclusionListCache(c *cache.InclusionLists) Option {
+	return func(s *Service) error {
+		s.inclusionListCache = c
+		return nil
+	}
+}
