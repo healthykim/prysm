@@ -196,7 +196,28 @@ func (s *Service) registerSubscribers(epoch primitives.Epoch, digest [4]byte) {
 			func(context.Context, proto.Message) error { return nil },
 			digest,
 			func(primitives.Slot) []uint64 { return nil },
-			func(currentSlot primitives.Slot) []uint64 { return []uint64{} },
+			func(currentSlot primitives.Slot) []uint64 { return []uint64{} })
+	}
+
+	// New Gossip Topic for ePBS
+	if epoch >= params.BeaconConfig().EPBSForkEpoch {
+		s.subscribe(
+			p2p.PayloadAttestationMessageTopicFormat,
+			s.validatePayloadAttestation,
+			s.payloadAttestationSubscriber,
+			digest,
+		)
+		s.subscribe(
+			p2p.SignedExecutionPayloadEnvelopeTopicFormat,
+			s.validateExecutionPayloadEnvelope,
+			s.executionPayloadEnvelopeSubscriber,
+			digest,
+		)
+		s.subscribe(
+			p2p.SignedExecutionPayloadHeaderTopicFormat,
+			s.validateExecutionPayloadHeader,
+			s.subscribeExecutionPayloadHeader,
+			digest,
 		)
 	}
 }

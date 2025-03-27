@@ -115,6 +115,27 @@ var (
 	)
 )
 
+var epbsFields = append(
+	altairFields,
+	types.NextWithdrawalIndex,
+	types.NextWithdrawalValidatorIndex,
+	types.HistoricalSummaries,
+	types.ExecutionPayloadHeader,    // new in ePBS
+	types.DepositRequestsStartIndex, // electra fields start here
+	types.DepositBalanceToConsume,
+	types.ExitBalanceToConsume,
+	types.EarliestExitEpoch,
+	types.ConsolidationBalanceToConsume,
+	types.EarliestConsolidationEpoch,
+	types.PendingDeposits,
+	types.PendingPartialWithdrawals,
+	types.PendingConsolidations,
+	types.LatestBlockHash, // ePBS fields start here
+	types.LatestFullSlot,
+	types.ExecutionPayloadHeader,
+	types.LastWithdrawalsRoot,
+)
+
 const (
 	phase0SharedFieldRefCount                     = 10
 	altairSharedFieldRefCount                     = 11
@@ -123,6 +144,7 @@ const (
 	denebSharedFieldRefCount                      = 13
 	electraSharedFieldRefCount                    = 16
 	fuluSharedFieldRefCount                       = 17
+	epbsSharedFieldRefCount                       = 16
 	experimentalStatePhase0SharedFieldRefCount    = 5
 	experimentalStateAltairSharedFieldRefCount    = 5
 	experimentalStateBellatrixSharedFieldRefCount = 6
@@ -130,6 +152,7 @@ const (
 	experimentalStateDenebSharedFieldRefCount     = 7
 	experimentalStateElectraSharedFieldRefCount   = 10
 	experimentalStateFuluSharedFieldRefCount      = 11
+	experimentalStateEpbsSharedFieldRefCount      = 10
 )
 
 // InitializeFromProtoPhase0 the beacon state from a protobuf representation.
@@ -165,6 +188,11 @@ func InitializeFromProtoElectra(st *ethpb.BeaconStateElectra) (state.BeaconState
 // InitializeFromProtoFulu the beacon state from a protobuf representation.
 func InitializeFromProtoFulu(st *ethpb.BeaconStateFulu) (state.BeaconState, error) {
 	return InitializeFromProtoUnsafeFulu(proto.Clone(st).(*ethpb.BeaconStateFulu))
+}
+
+// InitializeFromProtoEpbs initializes the beacon state from its protobuf representation.
+func InitializeFromProtoEpbs(st *ethpb.BeaconStateEPBS) (state.BeaconState, error) {
+	return InitializeFromProtoUnsafeEpbs(proto.Clone(st).(*ethpb.BeaconStateEPBS))
 }
 
 // InitializeFromProtoUnsafePhase0 directly uses the beacon state protobuf fields
@@ -996,6 +1024,8 @@ func (b *BeaconState) Copy() state.BeaconState {
 		fieldCount = params.BeaconConfig().BeaconStateElectraFieldCount
 	case version.Fulu:
 		fieldCount = params.BeaconConfig().BeaconStateFuluFieldCount
+	case version.EPBS:
+		fieldCount = params.BeaconConfig().BeaconStateEpbsFieldCount
 	}
 
 	dst := &BeaconState{
@@ -1013,6 +1043,9 @@ func (b *BeaconState) Copy() state.BeaconState {
 		earliestExitEpoch:             b.earliestExitEpoch,
 		consolidationBalanceToConsume: b.consolidationBalanceToConsume,
 		earliestConsolidationEpoch:    b.earliestConsolidationEpoch,
+		latestBlockHash:               b.latestBlockHash,
+		latestFullSlot:                b.latestFullSlot,
+		latestWithdrawalsRoot:         b.latestWithdrawalsRoot,
 
 		// Large arrays, infrequently changed, constant size.
 		blockRoots:                b.blockRoots,
@@ -1056,6 +1089,7 @@ func (b *BeaconState) Copy() state.BeaconState {
 		latestExecutionPayloadHeader:        b.latestExecutionPayloadHeader.Copy(),
 		latestExecutionPayloadHeaderCapella: b.latestExecutionPayloadHeaderCapella.Copy(),
 		latestExecutionPayloadHeaderDeneb:   b.latestExecutionPayloadHeaderDeneb.Copy(),
+		latestExecutionPayloadHeaderEPBS:    b.executionPayloadHeaderVal(),
 
 		id: types.Enumerator.Inc(),
 
@@ -1095,6 +1129,8 @@ func (b *BeaconState) Copy() state.BeaconState {
 			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, experimentalStateElectraSharedFieldRefCount)
 		case version.Fulu:
 			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, experimentalStateFuluSharedFieldRefCount)
+		case version.EPBS:
+			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, experimentalStateEpbsSharedFieldRefCount)
 		}
 	} else {
 		switch b.version {
@@ -1112,6 +1148,8 @@ func (b *BeaconState) Copy() state.BeaconState {
 			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, electraSharedFieldRefCount)
 		case version.Fulu:
 			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, fuluSharedFieldRefCount)
+		case version.EPBS:
+			dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, epbsSharedFieldRefCount)
 		}
 	}
 
@@ -1208,6 +1246,8 @@ func (b *BeaconState) initializeMerkleLayers(ctx context.Context) error {
 		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateElectraFieldCount)
 	case version.Fulu:
 		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateFuluFieldCount)
+	case version.EPBS:
+		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateEpbsFieldCount)
 	default:
 		return fmt.Errorf("unknown state version (%s) when computing dirty fields in merklization", version.String(b.version))
 	}
@@ -1454,6 +1494,14 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 		return stateutil.PendingConsolidationsRoot(b.pendingConsolidations)
 	case types.ProposerLookahead:
 		return stateutil.ProposerLookaheadRoot(b.proposerLookahead)
+	case types.LatestBlockHash:
+		return b.latestBlockHash, nil
+	case types.LatestFullSlot:
+		return ssz.Uint64Root(uint64(b.latestFullSlot)), nil
+	case types.ExecutionPayloadHeader:
+		return b.latestExecutionPayloadHeaderEPBS.HashTreeRoot()
+	case types.LastWithdrawalsRoot:
+		return b.latestWithdrawalsRoot, nil
 	}
 	return [32]byte{}, errors.New("invalid field index provided")
 }
