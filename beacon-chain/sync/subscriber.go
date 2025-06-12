@@ -535,8 +535,7 @@ func (s *Service) subscribeWithParameters(
 	genesisTime := s.cfg.clock.GenesisTime()
 
 	// Define a ticker ticking every slot.
-	secondsPerSlot := params.BeaconConfig().SecondsPerSlot
-	ticker := slots.NewSlotTicker(genesisTime, secondsPerSlot)
+	ticker := slots.NewSlotTicker(genesisTime, params.BeaconConfig().SlotTimeSchedule)
 
 	// Retrieve the current slot.
 	currentSlot := s.cfg.clock.CurrentSlot()
