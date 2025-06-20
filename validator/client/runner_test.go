@@ -355,7 +355,7 @@ func TestUpdateProposerSettingsAt_EpochEndOk(t *testing.T) {
 	node.EXPECT().IsHealthy(gomock.Any()).Return(true).AnyTimes()
 	v := &testutil.FakeValidator{
 		Km:                  &mockKeymanager{accountsChangedFeed: &event.Feed{}},
-		ProposerSettingWait: time.Duration(params.BeaconConfig().SecondsPerSlot-1) * time.Second,
+		ProposerSettingWait: time.Duration(params.BeaconConfig().SlotTimeDuration.SlotDuration(0)-1) * time.Second,
 		Tracker:             tracker,
 	}
 	err := v.SetProposerSettings(t.Context(), &proposer.Settings{
@@ -430,7 +430,7 @@ func TestRunnerPushesProposerSettings_ValidContext(t *testing.T) {
 	// Mocked client(s) setup.
 	vcm := validatormock.NewMockValidatorClient(ctrl)
 	vcm.EXPECT().WaitForChainStart(liveCtx, gomock.Any()).Return(&ethpb.ChainStartResponse{
-		GenesisTime: uint64(time.Now().Unix()) - params.BeaconConfig().SecondsPerSlot,
+		GenesisTime: uint64(time.Now().Unix()) - params.BeaconConfig().SlotTimeDuration.SlotDuration(0),
 	}, nil)
 	vcm.EXPECT().MultipleValidatorStatus(liveCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, req *ethpb.MultipleValidatorStatusRequest) (*ethpb.MultipleValidatorStatusResponse, error) {
 		defer assertValidContext(t, timedCtx, ctx)
