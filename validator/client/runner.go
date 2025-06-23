@@ -312,7 +312,7 @@ func handleAssignmentError(err error, slot primitives.Slot) {
 
 func runHealthCheckRoutine(ctx context.Context, v iface.Validator) {
 	log.Info("Starting health check routine for beacon node apis")
-  healthCheckTicker := time.NewTicker(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0)) // TODO(preston): Does this need to be dynamic?
+	healthCheckTicker := time.NewTicker(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0)) // TODO(preston): Does this need to be dynamic?
 	tracker := v.HealthTracker()
 	go func() {
 		// trigger the healthcheck immediately the first time

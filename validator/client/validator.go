@@ -427,10 +427,10 @@ func (v *validator) NextSlot() <-chan primitives.Slot {
 
 // SlotDeadline is the start time of the next slot.
 func (v *validator) SlotDeadline(slot primitives.Slot) time.Time {
-  sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(slot + 1)
-  if err != nil { // TODO(preston): Handle
-    panic(err) // lint:nopanic
-  }
+	sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(slot + 1)
+	if err != nil { // TODO(preston): Handle
+		panic(err) // lint:nopanic
+	}
 	return v.genesisTime.Add(sg)
 }
 

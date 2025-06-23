@@ -17,5 +17,5 @@ func (m *MockGenesisTimeFetcher) GenesisTime() time.Time {
 }
 
 func (m *MockGenesisTimeFetcher) CurrentSlot() primitives.Slot {
-  return params.BeaconConfig().SlotTimeSchedule.CurrentSlot(m.Genesis)
+	return params.BeaconConfig().SlotTimeSchedule.CurrentSlot(m.Genesis)
 }
