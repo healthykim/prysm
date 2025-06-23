@@ -316,7 +316,9 @@ func TestCheckSaveHotStateDB_Enabling(t *testing.T) {
 	hook := logTest.NewGlobal()
 	s, _ := minimalTestService(t)
 	st := params.BeaconConfig().SlotsPerEpoch.Mul(uint64(epochsSinceFinalitySaveHotStateDB))
-	s.genesisTime = time.Now().Add(time.Duration(-1*int64(st)*int64(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0))) * time.Second)
+	sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(st)
+	require.NoError(t, err)
+	s.genesisTime = time.Now().Add(-sg)
 
 	require.NoError(t, s.checkSaveHotStateDB(t.Context()))
 	assert.LogsContain(t, hook, "Entering mode to save hot states in DB")
@@ -328,7 +330,9 @@ func TestCheckSaveHotStateDB_Disabling(t *testing.T) {
 	s, _ := minimalTestService(t)
 
 	st := params.BeaconConfig().SlotsPerEpoch.Mul(uint64(epochsSinceFinalitySaveHotStateDB))
-	s.genesisTime = time.Now().Add(time.Duration(-1*int64(st)*int64(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0))) * time.Second)
+	sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(st)
+	require.NoError(t, err)
+	s.genesisTime = time.Now().Add(-sg)
 	require.NoError(t, s.checkSaveHotStateDB(t.Context()))
 	s.genesisTime = time.Now()
 
@@ -349,7 +353,9 @@ func TestHandleCaches_EnablingLargeSize(t *testing.T) {
 	hook := logTest.NewGlobal()
 	s, _ := minimalTestService(t)
 	st := params.BeaconConfig().SlotsPerEpoch.Mul(uint64(epochsSinceFinalitySaveHotStateDB))
-	s.SetGenesisTime(time.Now().Add(time.Duration(-1*int64(st)*int64(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0))) * time.Second))
+	sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(st)
+	require.NoError(t, err)
+	s.genesisTime = time.Now().Add(-sg)
 
 	helpers.ClearCache()
 	require.NoError(t, s.handleCaches())
@@ -361,7 +367,9 @@ func TestHandleCaches_DisablingLargeSize(t *testing.T) {
 	s, _ := minimalTestService(t)
 
 	st := params.BeaconConfig().SlotsPerEpoch.Mul(uint64(epochsSinceFinalitySaveHotStateDB))
-	s.genesisTime = time.Now().Add(time.Duration(-1*int64(st)*int64(params.BeaconConfig().SlotTimeSchedule.SlotDuration(0))) * time.Second)
+	sg, err := params.BeaconConfig().SlotTimeSchedule.SinceGenesis(st)
+	require.NoError(t, err)
+	s.genesisTime = time.Now().Add(-sg)
 	require.NoError(t, s.handleCaches())
 	s.genesisTime = time.Now()
 

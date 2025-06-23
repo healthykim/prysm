@@ -614,7 +614,7 @@ func TestServer_WaitToSlotOneThird_CanWait(t *testing.T) {
 	}
 
 	timeToSleep := params.BeaconConfig().SlotTimeSchedule.SlotDuration(0) / 3
-	oneThird := currentTime.Add(time.Duration(timeToSleep) * time.Second)
+	oneThird := currentTime.Add(timeToSleep)
 	v.waitOneThirdOrValidBlock(t.Context(), currentSlot)
 
 	if oneThird.Sub(time.Now()) > 10*time.Millisecond { // Allow for small diff due to execution time.

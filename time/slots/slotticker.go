@@ -99,7 +99,7 @@ func NewSlotTickerWithOffset(genesisTime time.Time, offset time.Duration, schedu
 	if genesisTime.Unix() == 0 {
 		panic("zero genesis time")
 	}
-	if offset > time.Duration(schedule.CurrentSlot(genesisTime))*time.Second { // TODO: Handle schedule validation. It should check that all durations are greater than this value.
+	if offset > schedule.CurrentSlotDuration(genesisTime) { // TODO: Handle schedule validation. It should check that all durations are greater than this value.
 		panic("invalid ticker offset")
 	}
 	ticker := &SlotTicker{
@@ -160,7 +160,7 @@ func (s *SlotIntervalTicker) startWithIntervals(
 		slot := CurrentSlot(genesisTime)
 		slot++
 		interval := 0
-		st, err := SlotTime(genesisTime, slot)
+		st, err := StartTime(genesisTime, slot)
 		if err != nil {
 			// TODO(preston): Handle.
 			panic(err) // lint:nopanic -- DEBUG
@@ -177,7 +177,7 @@ func (s *SlotIntervalTicker) startWithIntervals(
 					interval = 0
 					slot++
 				}
-				st, err := SlotTime(genesisTime, slot)
+				st, err := StartTime(genesisTime, slot)
 				if err != nil {
 					// TODO(preston): Handle.
 					panic(err) // lint:nopanic -- DEBUG

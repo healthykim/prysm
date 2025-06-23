@@ -48,7 +48,7 @@ var pollingPeriod = 6 * time.Second
 var batchPeriod = 2 * time.Second
 
 // Refresh rate of ENR set at twice per slot.
-var refreshRate = slots.DivideSlotBy(2)
+var refreshRate = slots.DivideSlotBy(0 /*slot TODO(preston): gotta deal with this*/, 2)
 
 // maxBadResponses is the maximum number of bad responses from a peer before we stop talking to it.
 const maxBadResponses = 5

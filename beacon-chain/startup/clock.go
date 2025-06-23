@@ -20,6 +20,8 @@ type Nower func() time.Time
 //     (support backwards compatibility with the TimeFetcher interface)
 //   - GenesisValidatorsRoot: is determined at the same point as genesis time and is needed by some of the same code,
 //     so it is also bundled for convenience.
+//
+// Deprecated: Just use time.Now(). TODO(preston): Consider removing this? There are very few usages of WithNewer.
 type Clock struct {
 	t   time.Time
 	vr  [32]byte
@@ -38,6 +40,8 @@ func (g *Clock) GenesisValidatorsRoot() [32]byte {
 
 // CurrentSlot returns the current slot relative to the time.Time value that Clock embeds.
 func (g *Clock) CurrentSlot() types.Slot {
+	// TODO(preston): The clock thing has a different view of "now" for testing. This whole thing could probably be removed
+	// where test setup is responsible for setting the genesis time correctly. It's usually not a big deal.
 	return params.BeaconConfig().SlotTimeSchedule.CurrentSlot(g.t)
 }
 
@@ -56,6 +60,7 @@ func (g *Clock) Now() time.Time {
 type ClockOpt func(*Clock)
 
 // WithNower allows tests in particular to inject an alternate implementation of time.Now (vs using system time)
+// Deprecated: Don't do this. TODO(preston): Remove?
 func WithNower(n Nower) ClockOpt {
 	return func(g *Clock) {
 		g.now = n
