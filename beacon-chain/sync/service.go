@@ -105,7 +105,6 @@ type config struct {
 	stateNotifier           statefeed.Notifier
 	blobStorage             *filesystem.BlobStorage
 	dataColumnStorage       *filesystem.DataColumnStorage
-	stagedCellCache         *cache.CellCache
 	custodyInfo             *peerdas.CustodyInfo
 }
 
@@ -114,6 +113,7 @@ type blockchainService interface {
 	blockchain.BlockReceiver
 	blockchain.BlobReceiver
 	blockchain.DataColumnReceiver
+	blockchain.CellReceiver
 	blockchain.HeadFetcher
 	blockchain.FinalizationFetcher
 	blockchain.ForkFetcher
@@ -147,6 +147,7 @@ type Service struct {
 	seenBlobCache                    *lru.Cache
 	seenDataColumnCache              *lru.Cache
 	seenCellCache                    *lru.Cache // key: tx_hash, blob_index, column_index
+	bufferCellCache                  *lru.Cache // cell buffer
 	seenAggregatedAttestationLock    sync.RWMutex
 	seenAggregatedAttestationCache   *lru.Cache
 	seenUnAggregatedAttestationLock  sync.RWMutex

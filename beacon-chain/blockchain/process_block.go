@@ -80,7 +80,7 @@ func (s *Service) postBlockProcess(cfg *postBlockProcessConfig) error {
 	defer s.sendStateFeedOnBlock(cfg)
 	defer reportProcessingTime(startTime)
 	defer reportAttestationInclusion(cfg.roblock.Block())
-	defer s.notifyPrediction(ctx)
+	// defer s.notifyPrediction(ctx)
 
 	err := s.cfg.ForkChoiceStore.InsertNode(ctx, cfg.postState, cfg.roblock)
 	if err != nil {
@@ -615,10 +615,6 @@ func (s *Service) stageCells(ctx context.Context) {
 		log.Debugf("Result for slot %d, root %#x", nextSlot, headRoot)
 		for _, r := range res {
 			log.Debugf("hash: %#x", r.TxHash)
-			log.Debug("blobId: ", r.BlobIndex)
-			log.Debug("blob: ", len(r.Blob))
-			log.Debug("comm: ", len(r.KzgCommitment))
-			log.Debug("cellproof", len(r.CellProofs))
 		}
 
 		for _, cell := range res {
@@ -860,7 +856,7 @@ func (s *Service) areDataColumnsAvailable(ctx context.Context, root [fieldparams
 	}
 
 	// Get a map of data column indices that are not currently available.
-	missingMap, err := missingDataColumnIndices(s.dataColumnStorage, root, s.StagedCellCache, signedBlock, peerInfo.CustodyColumns)
+	missingMap, err := missingDataColumnIndices(s.dataColumnStorage, root, s.stagedCellCache, signedBlock, peerInfo.CustodyColumns)
 	if err != nil {
 		return errors.Wrap(err, "missing data columns")
 	}

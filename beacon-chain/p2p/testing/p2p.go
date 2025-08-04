@@ -229,6 +229,12 @@ func (p *TestP2P) BroadcastDataColumn([fieldparams.RootLength]byte, uint64, *eth
 	return nil
 }
 
+// BroadcastCell broadcasts a cell for mock.
+func (p *TestP2P) BroadcastCell([fieldparams.RootLength]byte, uint64, *ethpb.CellSidecar) error {
+	p.BroadcastCalled.Store(true)
+	return nil
+}
+
 // SetStreamHandler for RPC.
 func (p *TestP2P) SetStreamHandler(topic string, handler network.StreamHandler) {
 	p.BHost.SetStreamHandler(protocol.ID(topic), handler)

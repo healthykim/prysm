@@ -182,13 +182,6 @@ func WithDataColumnStorage(b *filesystem.DataColumnStorage) Option {
 	}
 }
 
-func WithStagedCellCache(b *cache.CellCache) Option {
-	return func(s *Service) error {
-		s.cfg.stagedCellCache = b
-		return nil
-	}
-}
-
 // WithVerifierWaiter gives the sync package direct access to the verifier waiter.
 func WithVerifierWaiter(v *verification.InitializerWaiter) Option {
 	return func(s *Service) error {

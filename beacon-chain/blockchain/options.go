@@ -228,7 +228,7 @@ func WithDataColumnStorage(b *filesystem.DataColumnStorage) Option {
 
 func WithStagedCellCache(b *cache.CellCache) Option {
 	return func(s *Service) error {
-		s.StagedCellCache = b
+		s.stagedCellCache = b
 		return nil
 	}
 }

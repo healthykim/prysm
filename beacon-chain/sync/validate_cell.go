@@ -48,7 +48,6 @@ func (s *Service) validateCell(ctx context.Context, pid peer.ID, msg *pubsub.Mes
 
 	// todo(healthykim): Do we need verifier?
 	// todo(healthykim): Elaborate verifying logic
-
 	// Convert cellSidecar to ROCell type
 	roCell, err := blocks.NewROCell(cellSidecar)
 	if err != nil {
@@ -99,5 +98,5 @@ func (s *Service) hasSeenCellIndex(txHash []byte, blobIndex uint32, columnIndex 
 func (s *Service) setSeenCellIndex(txHash []byte, blobIndex uint32, columnIndex uint64) {
 	b := append(txHash, bytesutil.Bytes32(uint64(blobIndex))...)
 	b = append(b, bytesutil.Bytes32(columnIndex)...)
-	s.seenDataColumnCache.Add(string(b), true)
+	s.seenCellCache.Add(string(b), true)
 }

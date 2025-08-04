@@ -67,7 +67,7 @@ type Service struct {
 	blockBeingSynced     *currentlySyncingBlock
 	blobStorage          *filesystem.BlobStorage
 	dataColumnStorage    *filesystem.DataColumnStorage
-	StagedCellCache      *cache.CellCache
+	stagedCellCache      *cache.CellCache
 	slasherEnabled       bool
 	lcStore              *lightClient.Store
 }

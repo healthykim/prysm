@@ -48,6 +48,8 @@ var (
 		GetBlobsV1,
 		GetBlobsToStage,
 		NotifyPrediction,
+		ChangeBlobpoolMode,
+		CellVerification,
 	}
 	electraEngineEndpoints = []string{
 		NewPayloadMethodV4,
@@ -101,6 +103,10 @@ const (
 	GetBlobsToStage = "engine_getBlobsToStage"
 	// NotifyPrediction request string for JSON_RPC
 	NotifyPrediction = "engine_notifyPrediction"
+	// ChangeBlobpoolMode request string for JSON_RPC
+	ChangeBlobpoolMode = "engine_changeBlobpoolMode"
+	// CellVerification request string for JSON_RPC
+	CellVerification = "engine_cellVerification"
 	// Defines the seconds before timing out engine endpoints with non-block execution semantics.
 	// TODO: Remove temporarily needed hack since geth takes an input blobs txs with blobs proofs, and
 	// does the heavy lifting of building cells proofs, while normally this is done by the tx sender.
@@ -144,6 +150,8 @@ type EngineCaller interface {
 	) (*pb.PayloadIDBytes, []byte, error)
 	GetPayload(ctx context.Context, payloadId [8]byte, slot primitives.Slot) (*blocks.GetPayloadResponse, error)
 	NotifyPrediction(ctx context.Context, headBlockRoot common.Hash) (*pb.PredictionIDBytes, error)
+	ChangeBlobpoolMode(ctx context.Context, eager bool, duration uint16) error
+	CellVerification(ctx context.Context, hashes []common.Hash) ([]bool, error)
 	GetBlobsToStage(ctx context.Context, predictionId [8]byte) ([]*pb.BlobPredictionToStage, error)
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash, withTxs bool) (*pb.ExecutionBlock, error)
 	GetTerminalBlockHash(ctx context.Context, transitionTime uint64) ([]byte, bool, error)
@@ -581,6 +589,38 @@ func (s *Service) NotifyPrediction(ctx context.Context, headBlockRoot common.Has
 	result := &PredictionResponse{}
 	err := s.rpcClient.CallContext(ctx, result, NotifyPrediction, headBlockRoot, params.BeaconConfig().MaxPredictionSize)
 	return result.PredictionID, handleRPCError(err)
+}
+
+func (s *Service) ChangeBlobpoolMode(ctx context.Context, eager bool, duration uint16) error {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.ChangeBlobpoolMode")
+	defer span.End()
+
+	if !s.capabilityCache.has(ChangeBlobpoolMode) {
+		return errors.New(fmt.Sprintf("%s is not supported", ChangeBlobpoolMode))
+	}
+
+	err := s.rpcClient.CallContext(ctx, nil, ChangeBlobpoolMode, eager, duration)
+	return handleRPCError(err)
+}
+
+type VerificationResponse struct {
+	VerificationResult []bool `json:"verificationResult"`
+}
+
+func (s *Service) CellVerification(ctx context.Context, hashes []common.Hash) ([]bool, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.CellVerification")
+	defer span.End()
+
+	if !s.capabilityCache.has(CellVerification) {
+		return nil, errors.New(fmt.Sprintf("%s is not supported", CellVerification))
+	}
+
+	result := &VerificationResponse{}
+	err := s.rpcClient.CallContext(ctx, result, CellVerification, hashes)
+	if err != nil {
+		return nil, handleRPCError(err)
+	}
+	return result.VerificationResult, nil
 }
 
 // ReconstructFullBlock takes in a blinded beacon block and reconstructs

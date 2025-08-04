@@ -181,6 +181,14 @@ func (s *Service) notifyForkchoiceUpdate(ctx context.Context, arg *fcuConfig) (*
 			"nextSlot":  nextSlot,
 		}).Error("Received nil payload ID on VALID engine response")
 	}
+
+	// todo(healthykim) Consider to move this elsewhere
+	if hasAttr {
+		err := s.cfg.ExecutionEngineCaller.ChangeBlobpoolMode(s.ctx, true, 12_000)
+		if err != nil {
+			log.WithError(err).Error("could not change blobpool mode")
+		}
+	}
 	return payloadID, nil
 }
 
