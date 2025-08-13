@@ -160,7 +160,6 @@ func (s *Service) ReceiveBlock(ctx context.Context, block interfaces.ReadOnlySig
 		return err
 	}
 	s.reportPostBlockProcessing(blockCopy, blockRoot, receivedTime, daWaitedTime)
-	s.notifyPrediction(ctx)
 	return nil
 }
 

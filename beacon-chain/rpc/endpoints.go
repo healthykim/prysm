@@ -225,7 +225,6 @@ func (s *Service) validatorEndpoints(
 		OperationNotifier:      s.cfg.OperationNotifier,
 		TrackedValidatorsCache: s.cfg.TrackedValidatorsCache,
 		PayloadIDCache:         s.cfg.PayloadIDCache,
-		PredictionIDCache:      s.cfg.PredictionIDCache,
 		CoreService:            coreService,
 		BlockRewardFetcher:     rewardFetcher,
 	}

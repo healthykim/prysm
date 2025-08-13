@@ -104,7 +104,6 @@ type BeaconNode struct {
 	depositCache             cache.DepositCache
 	trackedValidatorsCache   *cache.TrackedValidatorsCache
 	payloadIDCache           *cache.PayloadIDCache
-	predictionIDCache        *cache.PredictionIDCache
 	stateFeed                *event.Feed
 	blockFeed                *event.Feed
 	opFeed                   *event.Feed
@@ -162,7 +161,6 @@ func New(cliCtx *cli.Context, cancel context.CancelFunc, opts ...Option) (*Beaco
 		blsToExecPool:           blstoexec.NewPool(),
 		trackedValidatorsCache:  cache.NewTrackedValidatorsCache(),
 		payloadIDCache:          cache.NewPayloadIDCache(),
-		predictionIDCache:       cache.NewPredictionIDCache(),
 		stagedCellCache:         cache.NewCellCache(),
 		slasherBlockHeadersFeed: new(event.Feed),
 		slasherAttestationsFeed: new(event.Feed),
@@ -804,7 +802,6 @@ func (b *BeaconNode) registerBlockchainService(fc forkchoice.ForkChoicer, gs *st
 		blockchain.WithStagedCellCache(b.stagedCellCache),
 		blockchain.WithTrackedValidatorsCache(b.trackedValidatorsCache),
 		blockchain.WithPayloadIDCache(b.payloadIDCache),
-		blockchain.WithPredictionIDCache(b.predictionIDCache),
 		blockchain.WithSyncChecker(b.syncChecker),
 		blockchain.WithCustodyInfo(b.custodyInfo),
 		blockchain.WithSlasherEnabled(b.slasherEnabled),
@@ -1048,7 +1045,6 @@ func (b *BeaconNode) registerRPCService(router *http.ServeMux) error {
 		DataColumnStorage:         b.DataColumnStorage,
 		TrackedValidatorsCache:    b.trackedValidatorsCache,
 		PayloadIDCache:            b.payloadIDCache,
-		PredictionIDCache:         b.predictionIDCache,
 		LCStore:                   b.lcStore,
 	})
 

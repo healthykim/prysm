@@ -1900,7 +1900,7 @@ func (x *BlobAndProofV2) GetKzgProofs() [][]byte {
 	return nil
 }
 
-type BlobPredictionToStage struct {
+type IncludableBlob struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TxHash        []byte                 `protobuf:"bytes,1,opt,name=tx_hash,json=txHash,proto3" json:"tx_hash,omitempty"`
 	BlobIndex     uint32                 `protobuf:"varint,2,opt,name=blob_index,json=blobIndex,proto3" json:"blob_index,omitempty"`
@@ -1911,20 +1911,20 @@ type BlobPredictionToStage struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BlobPredictionToStage) Reset() {
-	*x = BlobPredictionToStage{}
+func (x *IncludableBlob) Reset() {
+	*x = IncludableBlob{}
 	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BlobPredictionToStage) String() string {
+func (x *IncludableBlob) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BlobPredictionToStage) ProtoMessage() {}
+func (*IncludableBlob) ProtoMessage() {}
 
-func (x *BlobPredictionToStage) ProtoReflect() protoreflect.Message {
+func (x *IncludableBlob) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1936,40 +1936,40 @@ func (x *BlobPredictionToStage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BlobPredictionToStage.ProtoReflect.Descriptor instead.
-func (*BlobPredictionToStage) Descriptor() ([]byte, []int) {
+// Deprecated: Use IncludableBlob.ProtoReflect.Descriptor instead.
+func (*IncludableBlob) Descriptor() ([]byte, []int) {
 	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{20}
 }
 
-func (x *BlobPredictionToStage) GetTxHash() []byte {
+func (x *IncludableBlob) GetTxHash() []byte {
 	if x != nil {
 		return x.TxHash
 	}
 	return nil
 }
 
-func (x *BlobPredictionToStage) GetBlobIndex() uint32 {
+func (x *IncludableBlob) GetBlobIndex() uint32 {
 	if x != nil {
 		return x.BlobIndex
 	}
 	return 0
 }
 
-func (x *BlobPredictionToStage) GetBlob() []byte {
+func (x *IncludableBlob) GetBlob() []byte {
 	if x != nil {
 		return x.Blob
 	}
 	return nil
 }
 
-func (x *BlobPredictionToStage) GetKzgCommitment() []byte {
+func (x *IncludableBlob) GetKzgCommitment() []byte {
 	if x != nil {
 		return x.KzgCommitment
 	}
 	return nil
 }
 
-func (x *BlobPredictionToStage) GetCellProofs() [][]byte {
+func (x *IncludableBlob) GetCellProofs() [][]byte {
 	if x != nil {
 		return x.CellProofs
 	}
@@ -2187,8 +2187,8 @@ const file_proto_engine_v1_execution_engine_proto_rawDesc = "" +
 	"\x0eBlobAndProofV2\x12!\n" +
 	"\x04blob\x18\x01 \x01(\fB\r\x8a\xb5\x18\tblob.sizeR\x04blob\x12D\n" +
 	"\n" +
-	"kzg_proofs\x18\x02 \x03(\fB%\x8a\xb5\x18\x0248\x92\xb5\x18\x1bmax_cell_proofs_length.sizeR\tkzgProofs\"\xf1\x01\n" +
-	"\x15BlobPredictionToStage\x12\x1f\n" +
+	"kzg_proofs\x18\x02 \x03(\fB%\x8a\xb5\x18\x0248\x92\xb5\x18\x1bmax_cell_proofs_length.sizeR\tkzgProofs\"\xea\x01\n" +
+	"\x0eIncludableBlob\x12\x1f\n" +
 	"\atx_hash\x18\x01 \x01(\fB\x06\x8a\xb5\x18\x0232R\x06txHash\x12\x1d\n" +
 	"\n" +
 	"blob_index\x18\x02 \x01(\rR\tblobIndex\x12!\n" +
@@ -2234,7 +2234,7 @@ var file_proto_engine_v1_execution_engine_proto_goTypes = []any{
 	(*Blob)(nil),                                         // 18: ethereum.engine.v1.Blob
 	(*BlobAndProof)(nil),                                 // 19: ethereum.engine.v1.BlobAndProof
 	(*BlobAndProofV2)(nil),                               // 20: ethereum.engine.v1.BlobAndProofV2
-	(*BlobPredictionToStage)(nil),                        // 21: ethereum.engine.v1.BlobPredictionToStage
+	(*IncludableBlob)(nil),                               // 21: ethereum.engine.v1.IncludableBlob
 }
 var file_proto_engine_v1_execution_engine_proto_depIdxs = []int32{
 	15, // 0: ethereum.engine.v1.ExecutionPayloadCapella.withdrawals:type_name -> ethereum.engine.v1.Withdrawal

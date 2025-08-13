@@ -81,13 +81,6 @@ func WithPayloadIDCache(c *cache.PayloadIDCache) Option {
 	}
 }
 
-func WithPredictionIDCache(c *cache.PredictionIDCache) Option {
-	return func(s *Service) error {
-		s.cfg.PredictionIDCache = c
-		return nil
-	}
-}
-
 // WithTrackedValidatorsCache for tracked validators cache.
 func WithTrackedValidatorsCache(c *cache.TrackedValidatorsCache) Option {
 	return func(s *Service) error {

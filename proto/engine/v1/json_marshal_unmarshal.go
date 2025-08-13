@@ -68,15 +68,6 @@ func (b PayloadIDBytes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hexutil.Bytes(b[:]))
 }
 
-// PredictionIDBytes defines a custom type for Payload IDs used by the engine API
-// client with proper JSON Marshal and Unmarshal methods to hex.
-type PredictionIDBytes [8]byte
-
-// MarshalJSON --
-func (b PredictionIDBytes) MarshalJSON() ([]byte, error) {
-	return json.Marshal(hexutil.Bytes(b[:]))
-}
-
 // ExecutionBlock is the response kind received by the eth_getBlockByHash and
 // eth_getBlockByNumber endpoints via JSON-RPC.
 type ExecutionBlock struct {
@@ -194,16 +185,6 @@ func (e *ExecutionBlock) UnmarshalJSON(enc []byte) error {
 
 // UnmarshalJSON --
 func (b *PayloadIDBytes) UnmarshalJSON(enc []byte) error {
-	var res [8]byte
-	if err := hexutil.UnmarshalFixedJSON(reflect.TypeOf(b), enc, res[:]); err != nil {
-		return err
-	}
-	*b = res
-	return nil
-}
-
-// UnmarshalJSON --
-func (b *PredictionIDBytes) UnmarshalJSON(enc []byte) error {
 	var res [8]byte
 	if err := hexutil.UnmarshalFixedJSON(reflect.TypeOf(b), enc, res[:]); err != nil {
 		return err
@@ -1480,7 +1461,7 @@ func (b *BlobAndProofV2) UnmarshalJSON(enc []byte) error {
 	return nil
 }
 
-type BlobPredictionToStageJson struct {
+type IncludableBlobJson struct {
 	TxHash        common.Hash     `json:"txHash"`        //32
 	BlobIndex     uint            `json:"blobIndex"`     //4
 	Blob          hexutil.Bytes   `json:"blob"`          //
@@ -1488,8 +1469,8 @@ type BlobPredictionToStageJson struct {
 	CellProofs    []hexutil.Bytes `json:"cellProofs"`
 }
 
-func (b *BlobPredictionToStage) UnmarshalJSON(enc []byte) error {
-	var dec *BlobPredictionToStageJson
+func (b *IncludableBlob) UnmarshalJSON(enc []byte) error {
+	var dec *IncludableBlobJson
 	if err := json.Unmarshal(enc, &dec); err != nil {
 		return err
 	}

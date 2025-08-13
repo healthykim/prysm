@@ -46,8 +46,7 @@ var (
 		GetPayloadBodiesByHashV1,
 		GetPayloadBodiesByRangeV1,
 		GetBlobsV1,
-		GetBlobsToStage,
-		NotifyPrediction,
+		GetIncludableBlobs,
 		ChangeBlobpoolMode,
 		CellVerification,
 	}
@@ -99,10 +98,8 @@ const (
 	GetBlobsV1 = "engine_getBlobsV1"
 	// GetBlobsV2 request string for JSON-RPC.
 	GetBlobsV2 = "engine_getBlobsV2"
-	// GetBlobsToStage request string for JSON_RPC
-	GetBlobsToStage = "engine_getBlobsToStage"
-	// NotifyPrediction request string for JSON_RPC
-	NotifyPrediction = "engine_notifyPrediction"
+	// GetIncludableBlobs request string for JSON_RPC
+	GetIncludableBlobs = "engine_getIncludableBlobs"
 	// ChangeBlobpoolMode request string for JSON_RPC
 	ChangeBlobpoolMode = "engine_changeBlobpoolMode"
 	// CellVerification request string for JSON_RPC
@@ -149,10 +146,9 @@ type EngineCaller interface {
 		ctx context.Context, state *pb.ForkchoiceState, attrs payloadattribute.Attributer,
 	) (*pb.PayloadIDBytes, []byte, error)
 	GetPayload(ctx context.Context, payloadId [8]byte, slot primitives.Slot) (*blocks.GetPayloadResponse, error)
-	NotifyPrediction(ctx context.Context, headBlockRoot common.Hash) (*pb.PredictionIDBytes, error)
+	GetIncludableBlobs(ctx context.Context) ([]*pb.IncludableBlob, error)
 	ChangeBlobpoolMode(ctx context.Context, eager bool, duration uint16) error
 	CellVerification(ctx context.Context, hashes []common.Hash) ([]bool, error)
-	GetBlobsToStage(ctx context.Context, predictionId [8]byte) ([]*pb.BlobPredictionToStage, error)
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash, withTxs bool) (*pb.ExecutionBlock, error)
 	GetTerminalBlockHash(ctx context.Context, transitionTime uint64) ([]byte, bool, error)
 }
@@ -560,35 +556,20 @@ func (s *Service) GetBlobsV2(ctx context.Context, versionedHashes []common.Hash)
 	return result, handleRPCError(err)
 }
 
-func (s *Service) GetBlobsToStage(ctx context.Context, predictionId [8]byte) ([]*pb.BlobPredictionToStage, error) {
-	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetBlobsToStage")
+func (s *Service) GetIncludableBlobs(ctx context.Context) ([]*pb.IncludableBlob, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetIncludableBlob")
 	defer span.End()
 
-	if !s.capabilityCache.has(GetBlobsToStage) {
-		return nil, errors.New(fmt.Sprintf("%s is not supported", GetBlobsToStage))
+	if !s.capabilityCache.has(GetIncludableBlobs) {
+		return nil, errors.New(fmt.Sprintf("%s is not supported", GetIncludableBlobs))
 	}
 
 	// todo(healthykim): should we set the length as a beacon parameter
-	result := make([]*pb.BlobPredictionToStage, params.BeaconConfig().MaxPredictionSize)
-	err := s.rpcClient.CallContext(ctx, &result, GetBlobsToStage, pb.PredictionIDBytes(predictionId))
+	returnSize := params.BeaconConfig().StagingSize
+	windowSize := params.BeaconConfig().WindowSize
+	result := make([]*pb.IncludableBlob, returnSize)
+	err := s.rpcClient.CallContext(ctx, &result, GetIncludableBlobs, returnSize, windowSize)
 	return result, handleRPCError(err)
-}
-
-type PredictionResponse struct {
-	PredictionID *pb.PredictionIDBytes `json:"predictionId"`
-}
-
-func (s *Service) NotifyPrediction(ctx context.Context, headBlockRoot common.Hash) (*pb.PredictionIDBytes, error) {
-	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.NotifyPrediction")
-	defer span.End()
-
-	if !s.capabilityCache.has(NotifyPrediction) {
-		return nil, errors.New(fmt.Sprintf("%s is not supported", NotifyPrediction))
-	}
-
-	result := &PredictionResponse{}
-	err := s.rpcClient.CallContext(ctx, result, NotifyPrediction, headBlockRoot, params.BeaconConfig().MaxPredictionSize)
-	return result.PredictionID, handleRPCError(err)
 }
 
 func (s *Service) ChangeBlobpoolMode(ctx context.Context, eager bool, duration uint16) error {

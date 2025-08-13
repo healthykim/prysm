@@ -38,5 +38,4 @@ type Server struct {
 	BlockRewardFetcher     rewards.BlockRewardsFetcher
 	TrackedValidatorsCache *cache.TrackedValidatorsCache
 	PayloadIDCache         *cache.PayloadIDCache
-	PredictionIDCache      *cache.PredictionIDCache
 }

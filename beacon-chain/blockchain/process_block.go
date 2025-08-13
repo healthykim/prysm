@@ -80,7 +80,6 @@ func (s *Service) postBlockProcess(cfg *postBlockProcessConfig) error {
 	defer s.sendStateFeedOnBlock(cfg)
 	defer reportProcessingTime(startTime)
 	defer reportAttestationInclusion(cfg.roblock.Block())
-	// defer s.notifyPrediction(ctx)
 
 	err := s.cfg.ForkChoiceStore.InsertNode(ctx, cfg.postState, cfg.roblock)
 	if err != nil {
@@ -576,8 +575,6 @@ func (s *Service) runStagingTasks() {
 
 	for {
 		select {
-		// case <-slotTicker.C():
-		// 	s.notifyPrediction(s.ctx)
 		case <-ticker.C():
 			s.stageCells(s.ctx)
 		case <-s.ctx.Done():
@@ -587,54 +584,33 @@ func (s *Service) runStagingTasks() {
 	}
 }
 
-func (s *Service) notifyPrediction(ctx context.Context) {
-	headRoot := s.headRoot()
-	nextSlot := s.CurrentSlot().Add(1)
-	predictionID, err := s.cfg.ExecutionEngineCaller.NotifyPrediction(ctx, headRoot)
-	if err != nil {
-		log.WithError(err).Debug("could not notify prediction")
-		return
-	}
-
-	s.cfg.PredictionIDCache.Set(nextSlot, headRoot, primitives.PredictionID(*predictionID))
-	log.Debugf("Set predictionID, id: %#x, slot: %d, headRoot: %#x", predictionID, nextSlot, headRoot)
-}
-
 func (s *Service) stageCells(ctx context.Context) {
 	nextSlot := s.CurrentSlot().Add(1)
 	headRoot := s.headRoot()
+	res, err := s.cfg.ExecutionEngineCaller.GetIncludableBlobs(ctx)
+	if err != nil {
+		log.WithError(err).Debug("could not get blobs to stage")
+		return
+	}
+	log.Debugf("Result for slot %d, root %#x", nextSlot, headRoot)
+	for _, r := range res {
+		log.Debugf("hash: %#x", r.TxHash)
+	}
 
-	predictionId, has := s.cfg.PredictionIDCache.PredictionID(nextSlot, headRoot)
-
-	if has {
-		res, err := s.cfg.ExecutionEngineCaller.GetBlobsToStage(ctx, predictionId)
+	for _, cell := range res {
+		cellSidecars, err := peerdas.ConstructCellSidecars(cell.TxHash, cell.BlobIndex, cell.KzgCommitment, cell.Blob, cell.CellProofs)
 		if err != nil {
-			log.WithError(err).Debug("could not get blobs to stage")
+			log.WithError(err).Debug("Error for ConstructCellSidecars")
 			return
 		}
-		log.Debugf("Result for slot %d, root %#x", nextSlot, headRoot)
-		for _, r := range res {
-			log.Debugf("hash: %#x", r.TxHash)
-		}
-
-		for _, cell := range res {
-			cellSidecars, err := peerdas.ConstructCellSidecars(cell.TxHash, cell.BlobIndex, cell.KzgCommitment, cell.Blob, cell.CellProofs)
+		for cellIdx, cellSidecar := range cellSidecars {
+			cellSubnet := peerdas.ComputeSubnetForCellSidecar(uint64(cellIdx))
+			err := s.cfg.P2P.BroadcastCell(headRoot, cellSubnet, cellSidecar)
 			if err != nil {
-				log.WithError(err).Debug("Error for ConstructCellSidecars")
+				log.WithError(err).Debug("Error for BroadcastCell")
 				return
 			}
-			for cellIdx, cellSidecar := range cellSidecars {
-				cellSubnet := peerdas.ComputeSubnetForCellSidecar(uint64(cellIdx))
-				err := s.cfg.P2P.BroadcastCell(headRoot, cellSubnet, cellSidecar)
-				if err != nil {
-					log.WithError(err).Debug("Error for BroadcastCell")
-					return
-				}
-			}
 		}
-
-	} else {
-		log.Debugf("No predictionId - id %d, currSlot %d, headRoot %#x", predictionId, nextSlot, headRoot)
 	}
 }
 

@@ -300,7 +300,8 @@ type BeaconChainConfig struct {
 	BlobSchedule []BlobScheduleEntry `yaml:"BLOB_SCHEDULE"`
 
 	// Cell Staging Values
-	MaxPredictionSize uint8 `yaml:"MAX_PREDICTION_SIZE" spec:"false"`
+	StagingSize uint8 `yaml:"STAGING_SIZE" spec:"false"`
+	WindowSize  uint8 `yaml:"WINDOW_SIZE" spec:"false"`
 
 	// Deprecated_MaxBlobsPerBlock defines the max blobs that could exist in a block.
 	// Deprecated: This field is no longer supported. Avoid using it.
