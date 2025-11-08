@@ -3,7 +3,7 @@ package params
 import (
 	"math"
 
-	"github.com/OffchainLabs/prysm/v6/encoding/bytesutil"
+	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 )
 
 // MinimalSpecConfig retrieves the minimal config used in spec tests.
@@ -111,7 +111,6 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.MinPerEpochChurnLimitElectra = 64000000000
 	minimalConfig.MaxPerEpochActivationExitChurnLimit = 128000000000
 	minimalConfig.PendingConsolidationsLimit = 64
-	minimalConfig.MaxPartialWithdrawalsPerPayload = 1
 	minimalConfig.PendingPartialWithdrawalsLimit = 64
 	minimalConfig.MaxPendingPartialsPerWithdrawalsSweep = 2
 	minimalConfig.PendingDepositsLimit = 134217728

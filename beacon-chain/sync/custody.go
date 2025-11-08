@@ -1,14 +1,15 @@
 package sync
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"github.com/OffchainLabs/prysm/v6/async"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/peerdas"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
-	"github.com/OffchainLabs/prysm/v6/cmd/beacon-chain/flags"
-	"github.com/OffchainLabs/prysm/v6/config/params"
+	"github.com/OffchainLabs/prysm/v7/async"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/peerdas"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
+	"github.com/OffchainLabs/prysm/v7/cmd/beacon-chain/flags"
+	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -29,13 +30,13 @@ func (s *Service) updateCustodyInfoIfNeeded() error {
 	const minimumPeerCount = 1
 
 	// Get our actual custody group count.
-	actualCustodyGrounpCount, err := s.cfg.p2p.CustodyGroupCount()
+	actualCustodyGrounpCount, err := s.cfg.p2p.CustodyGroupCount(s.ctx)
 	if err != nil {
 		return errors.Wrap(err, "p2p custody group count")
 	}
 
 	// Get our target custody group count.
-	targetCustodyGroupCount, err := s.custodyGroupCount()
+	targetCustodyGroupCount, err := s.custodyGroupCount(s.ctx)
 	if err != nil {
 		return errors.Wrap(err, "custody group count")
 	}
@@ -122,11 +123,11 @@ func (s *Service) updateCustodyInfoIfNeeded() error {
 
 // custodyGroupCount computes the custody group count based on the custody requirement,
 // the validators custody requirement, and whether the node is subscribed to all data subnets.
-func (s *Service) custodyGroupCount() (uint64, error) {
-	beaconConfig := params.BeaconConfig()
+func (s *Service) custodyGroupCount(context.Context) (uint64, error) {
+	cfg := params.BeaconConfig()
 
 	if flags.Get().SubscribeAllDataSubnets {
-		return beaconConfig.NumberOfCustodyGroups, nil
+		return cfg.NumberOfCustodyGroups, nil
 	}
 
 	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement()
@@ -134,9 +135,9 @@ func (s *Service) custodyGroupCount() (uint64, error) {
 		return 0, errors.Wrap(err, "validators custody requirement")
 	}
 
-	result := max(beaconConfig.CustodyRequirement, validatorsCustodyRequirement)
+	result := max(cfg.CustodyRequirement, validatorsCustodyRequirement)
 	log.WithFields(logrus.Fields{
-		"custodyRequirement":           beaconConfig.CustodyRequirement,
+		"custodyRequirement":           cfg.CustodyRequirement,
 		"validatorsCustodyRequirement": validatorsCustodyRequirement,
 		"result":                       result,
 	}).Info("Custody group count calculation")

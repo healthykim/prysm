@@ -3,14 +3,14 @@ package testing
 import (
 	"context"
 
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/peers"
-	fieldparams "github.com/OffchainLabs/prysm/v6/config/fieldparams"
-	"github.com/OffchainLabs/prysm/v6/consensus-types/blocks"
-	"github.com/OffchainLabs/prysm/v6/consensus-types/interfaces"
-	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
-	ethpb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
-	"github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1/metadata"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p/encoder"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p/peers"
+	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
+	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1/metadata"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -199,18 +199,23 @@ func (*FakeP2P) InterceptUpgraded(network.Conn) (allow bool, reason control.Disc
 }
 
 // EarliestAvailableSlot -- fake.
-func (*FakeP2P) EarliestAvailableSlot() (primitives.Slot, error) {
+func (*FakeP2P) EarliestAvailableSlot(context.Context) (primitives.Slot, error) {
 	return 0, nil
 }
 
 // CustodyGroupCount -- fake.
-func (*FakeP2P) CustodyGroupCount() (uint64, error) {
+func (*FakeP2P) CustodyGroupCount(context.Context) (uint64, error) {
 	return 0, nil
 }
 
 // UpdateCustodyInfo -- fake.
 func (s *FakeP2P) UpdateCustodyInfo(earliestAvailableSlot primitives.Slot, custodyGroupCount uint64) (primitives.Slot, uint64, error) {
 	return earliestAvailableSlot, custodyGroupCount, nil
+}
+
+// UpdateEarliestAvailableSlot -- fake.
+func (*FakeP2P) UpdateEarliestAvailableSlot(earliestAvailableSlot primitives.Slot) error {
+	return nil
 }
 
 // CustodyGroupCountFromPeer -- fake.

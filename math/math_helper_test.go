@@ -5,8 +5,8 @@ import (
 	stdmath "math"
 	"testing"
 
-	"github.com/OffchainLabs/prysm/v6/math"
-	"github.com/OffchainLabs/prysm/v6/testing/require"
+	"github.com/OffchainLabs/prysm/v7/math"
+	"github.com/OffchainLabs/prysm/v7/testing/require"
 )
 
 func TestIntegerSquareRoot(t *testing.T) {
@@ -291,80 +291,6 @@ func TestPowerOf2(t *testing.T) {
 	}
 	for _, tt := range tests {
 		require.Equal(t, tt.b, math.PowerOf2(tt.a))
-	}
-}
-
-func TestMaxValue(t *testing.T) {
-	tests := []struct {
-		a      uint64
-		b      uint64
-		result uint64
-	}{
-		{
-			a:      10,
-			b:      8,
-			result: 10,
-		},
-		{
-			a:      300,
-			b:      256,
-			result: 300,
-		},
-		{
-			a:      1200,
-			b:      1024,
-			result: 1200,
-		},
-		{
-			a:      4500,
-			b:      4096,
-			result: 4500,
-		},
-		{
-			a:      9999,
-			b:      9999,
-			result: 9999,
-		},
-	}
-	for _, tt := range tests {
-		require.Equal(t, tt.result, math.Max(tt.a, tt.b))
-	}
-}
-
-func TestMinValue(t *testing.T) {
-	tests := []struct {
-		a      uint64
-		b      uint64
-		result uint64
-	}{
-		{
-			a:      10,
-			b:      8,
-			result: 8,
-		},
-		{
-			a:      300,
-			b:      256,
-			result: 256,
-		},
-		{
-			a:      1200,
-			b:      1024,
-			result: 1024,
-		},
-		{
-			a:      4500,
-			b:      4096,
-			result: 4096,
-		},
-		{
-			a:      9999,
-			b:      9999,
-			result: 9999,
-		},
-	}
-	for _, tt := range tests {
-		require.Equal(t, tt.result, math.Min(tt.a, tt.b))
 	}
 }
 
