@@ -40,8 +40,14 @@ func (s *Service) updateCustodyInfoIfNeeded() error {
 		return errors.Wrap(err, "custody group count")
 	}
 
+	log.WithFields(logrus.Fields{
+		"actualCustodyGroupCount": actualCustodyGrounpCount,
+		"targetCustodyGroupCount": targetCustodyGroupCount,
+	}).Info("Custody info update check")
+
 	// If the actual custody group count is already equal to the target, skip the update.
 	if actualCustodyGrounpCount >= targetCustodyGroupCount {
+		log.Info("Skipping custody update - already at target")
 		return nil
 	}
 
@@ -83,6 +89,34 @@ func (s *Service) updateCustodyInfoIfNeeded() error {
 		return errors.Wrap(err, "beacon db update custody info")
 	}
 
+	log.WithFields(logrus.Fields{
+		"storedGroupCount":        storedGroupCount,
+		"actualCustodyGroupCount": actualCustodyGrounpCount,
+		"targetCustodyGroupCount": targetCustodyGroupCount,
+	}).Info("After UpdateCustodyInfo")
+
+	// Check if we should skip custody changes due to proposer preparation
+	if storedGroupCount > actualCustodyGrounpCount {
+		// Check if blockchain service is preparing for proposal
+		if s.cfg.chain.ShouldSkipCustodyChange(s.ctx) {
+			log.WithFields(logrus.Fields{
+				"storedGroupCount": storedGroupCount,
+				"actualGroupCount": actualCustodyGrounpCount,
+			}).Info("Skipped custody columns change due to proposer preparation")
+			return nil
+		}
+
+		nodeID := s.cfg.p2p.NodeID()
+		peerInfo, _, err := peerdas.Info(nodeID, storedGroupCount)
+		if err != nil {
+			log.WithError(err).Error("Failed to compute custody columns for notification")
+		} else if peerInfo != nil && len(peerInfo.CustodyColumns) > 0 {
+			if err := s.cfg.p2p.NotifyCustodyColumnsChange(s.ctx, peerInfo.CustodyColumns, s.cfg.executionReconstructor); err != nil {
+				log.WithError(err).Error("Failed to notify custody columns change")
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -100,7 +134,14 @@ func (s *Service) custodyGroupCount() (uint64, error) {
 		return 0, errors.Wrap(err, "validators custody requirement")
 	}
 
-	return max(beaconConfig.CustodyRequirement, validatorsCustodyRequirement), nil
+	result := max(beaconConfig.CustodyRequirement, validatorsCustodyRequirement)
+	log.WithFields(logrus.Fields{
+		"custodyRequirement":           beaconConfig.CustodyRequirement,
+		"validatorsCustodyRequirement": validatorsCustodyRequirement,
+		"result":                       result,
+	}).Info("Custody group count calculation")
+
+	return result, nil
 }
 
 // validatorsCustodyRequirements computes the custody requirements based on the

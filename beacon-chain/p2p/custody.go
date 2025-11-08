@@ -1,6 +1,9 @@
 package p2p
 
 import (
+	"context"
+	"reflect"
+
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/peerdas"
 	"github.com/OffchainLabs/prysm/v6/config/params"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
@@ -177,6 +180,36 @@ func (s *Service) custodyGroupCountFromPeerENR(pid peer.ID) uint64 {
 	}
 
 	return custodyGroupCount
+}
+
+// NotifyCustodyColumnsChange notifies the execution engine when custody columns change.
+// This should be called when the actual custody columns (not just the count) change.
+func (s *Service) NotifyCustodyColumnsChange(ctx context.Context, custodyColumns map[uint64]bool, engineCaller interface{}) error {
+	if engineCaller == nil || len(custodyColumns) == 0 {
+		return nil
+	}
+
+	// Convert custody columns map to []uint64
+	columns := make([]uint64, 0, len(custodyColumns))
+	for columnIndex := range custodyColumns {
+		columns = append(columns, columnIndex)
+	}
+
+	// Use reflection to call BlobCustodyUpdatedV1 method
+	if method := reflect.ValueOf(engineCaller).MethodByName("BlobCustodyUpdatedV1"); method.IsValid() {
+		results := method.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(columns)})
+		if len(results) > 0 && !results[0].IsNil() {
+			if err := results[0].Interface().(error); err != nil {
+				log.WithError(err).Error("Failed to call BlobCustodyUpdatedV1 during custody columns change")
+				return err
+			}
+			log.WithFields(logrus.Fields{
+				"custodyColumns": columns,
+			}).Info("Successfully called BlobCustodyUpdatedV1 during custody columns change")
+		}
+	}
+
+	return nil
 }
 
 func fuluForkSlot() (primitives.Slot, error) {

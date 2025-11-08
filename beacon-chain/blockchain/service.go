@@ -14,6 +14,7 @@ import (
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/cache"
 	statefeed "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/state"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/helpers"
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/peerdas"
 	coreTime "github.com/OffchainLabs/prysm/v6/beacon-chain/core/time"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/db"
@@ -212,6 +213,7 @@ func (s *Service) Start() {
 	}
 	s.spawnProcessAttestationsRoutine()
 	go s.runLateBlockTasks()
+	go s.runCustodyManagementTasks()
 }
 
 // Stop the blockchain service's main event loop and associated goroutines.
@@ -301,6 +303,21 @@ func (s *Service) StartFromSavedState(saved state.BeaconState) error {
 
 	if _, _, err := s.cfg.P2P.UpdateCustodyInfo(earliestAvailableSlot, custodySubnetCount); err != nil {
 		return errors.Wrap(err, "update custody info")
+	}
+
+	// Call BlobCustodyUpdatedV1 API when EL is connected and custody info is available
+	if s.cfg.ExecutionEngineCaller != nil && custodySubnetCount > 0 {
+		// Compute actual custody columns based on node ID and custody group count
+		nodeID := s.cfg.P2P.NodeID()
+		peerInfo, _, err := peerdas.Info(nodeID, custodySubnetCount)
+		if err != nil {
+			log.WithError(err).Error("Failed to compute custody columns during EL connection")
+		} else if peerInfo != nil && len(peerInfo.CustodyColumns) > 0 {
+			// Call NotifyCustodyColumnsChange with actual custody columns
+			if err := s.cfg.P2P.NotifyCustodyColumnsChange(s.ctx, peerInfo.CustodyColumns, s.cfg.ExecutionEngineCaller); err != nil {
+				log.WithError(err).Error("Failed to notify custody columns change during EL connection")
+			}
+		}
 	}
 
 	return nil

@@ -578,6 +578,41 @@ func (s *Service) validateMergeTransitionBlock(ctx context.Context, stateVersion
 	return s.validateMergeBlock(ctx, blk)
 }
 
+// runCustodyManagementTasks runs custody management tasks every slot.
+// This ensures custody columns are properly managed for proposers.
+func (s *Service) runCustodyManagementTasks() {
+	if err := s.waitForSync(); err != nil {
+		log.WithError(err).Error("Failed to wait for initial sync")
+		return
+	}
+
+	ticker := slots.NewSlotTicker(s.genesisTime, params.BeaconConfig().SecondsPerSlot)
+	for {
+		select {
+		case <-ticker.C():
+			s.custodyManagementTasks(s.ctx)
+		case <-s.ctx.Done():
+			log.Debug("Context closed, exiting custody management routine")
+			return
+		}
+	}
+}
+
+// custodyManagementTasks performs custody management tasks for each slot.
+func (s *Service) custodyManagementTasks(ctx context.Context) {
+	if !s.inRegularSync() {
+		return
+	}
+
+	s.headLock.RLock()
+	headState := s.headState(ctx)
+	currentSlot := s.CurrentSlot()
+	s.headLock.RUnlock()
+
+	// Manage custody for proposers
+	s.manageCustodyForProposer(ctx, headState, currentSlot)
+}
+
 // This routine checks if there is a cached proposer payload ID available for the next slot proposer.
 // If there is not, it will call forkchoice updated with the correct payload attribute then cache the payload ID.
 func (s *Service) runLateBlockTasks() {
@@ -936,6 +971,7 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 	if err := s.handleEpochBoundary(ctx, currentSlot, headState, headRoot[:]); err != nil {
 		log.WithError(err).Error("Could not update epoch boundary caches")
 	}
+
 	// return early if we already started building a block for the current
 	// head root
 	_, has := s.cfg.PayloadIDCache.PayloadID(s.CurrentSlot()+1, headRoot)
@@ -977,6 +1013,89 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 	}
 }
 
+func (s *Service) manageCustodyForProposer(ctx context.Context, headState state.BeaconState, currentSlot primitives.Slot) {
+	if s.cfg.ExecutionEngineCaller == nil || !params.FuluEnabled() {
+		return
+	}
+
+	// Check if I am proposing 2 slots from now (currentSlot + 2)
+	// Can be configured
+	val, isProposerIn2Slots := s.trackedProposer(headState, currentSlot+2)
+	if isProposerIn2Slots {
+		// 2 slots before proposing: send all custody columns
+		allColumns := make([]uint64, params.BeaconConfig().NumberOfColumns)
+		for j := uint64(0); j < params.BeaconConfig().NumberOfColumns; j++ {
+			allColumns[j] = j
+		}
+
+		allColumnsMap := make(map[uint64]bool, len(allColumns))
+		for _, col := range allColumns {
+			allColumnsMap[col] = true
+		}
+
+		if err := s.cfg.P2P.NotifyCustodyColumnsChange(ctx, allColumnsMap, s.cfg.ExecutionEngineCaller); err != nil {
+			log.WithError(err).WithFields(logrus.Fields{
+				"proposingSlot": currentSlot + 2,
+				"feeRecipient":  fmt.Sprintf("%#x", val.FeeRecipient),
+			}).Error("Failed to notify all custody columns before proposing")
+		} else {
+			log.WithFields(logrus.Fields{
+				"currentSlot":        currentSlot,
+				"proposingSlot":      currentSlot + 2,
+				"custodyColumnCount": len(allColumns),
+			}).Info("Notified all custody columns 2 slots before proposing")
+		}
+		return
+	}
+
+	// Check if I just finished proposing (previous slot)
+	if currentSlot > 0 {
+		previousSlot := currentSlot - 1
+		_, wasProposer := s.trackedProposer(headState, previousSlot)
+		if wasProposer {
+			// Check if I have another proposal within the next 2 slots
+			hasUpcomingProposal := false
+			for i := primitives.Slot(1); i <= 2; i++ {
+				upcomingSlot := currentSlot + i
+				_, isProposer := s.trackedProposer(headState, upcomingSlot)
+				if isProposer {
+					hasUpcomingProposal = true
+					break
+				}
+			}
+
+			if !hasUpcomingProposal {
+				nodeID := s.cfg.P2P.NodeID()
+				custodyGroupCount, err := s.cfg.P2P.CustodyGroupCount()
+				if err != nil {
+					log.WithError(err).Error("Failed to get custody group count for restoration")
+					return
+				}
+
+				peerInfo, _, err := peerdas.Info(nodeID, custodyGroupCount)
+				if err != nil {
+					log.WithError(err).Error("Failed to compute original custody columns for restoration")
+				} else if peerInfo != nil && len(peerInfo.CustodyColumns) > 0 {
+					if err := s.cfg.P2P.NotifyCustodyColumnsChange(ctx, peerInfo.CustodyColumns, s.cfg.ExecutionEngineCaller); err != nil {
+						log.WithError(err).Error("Failed to restore original custody columns after proposing")
+					} else {
+						log.WithFields(logrus.Fields{
+							"proposedSlot":       previousSlot,
+							"currentSlot":        currentSlot,
+							"custodyColumnCount": len(peerInfo.CustodyColumns),
+						}).Info("Restored original custody columns after proposing")
+					}
+				}
+			} else {
+				log.WithFields(logrus.Fields{
+					"proposedSlot": previousSlot,
+					"currentSlot":  currentSlot,
+				}).Info("Skipped custody restoration due to upcoming proposal within 2 slots")
+			}
+		}
+	}
+}
+
 // waitForSync blocks until the node is synced to the head.
 func (s *Service) waitForSync() error {
 	select {
@@ -1004,4 +1123,35 @@ func (s *Service) rollbackBlock(ctx context.Context, blockRoot [32]byte) {
 	if err := s.cfg.BeaconDB.DeleteBlock(ctx, blockRoot); err != nil {
 		log.WithError(err).Errorf("Could not delete block with block root %#x", blockRoot)
 	}
+}
+
+// IsPreparingForProposal checks if the node is preparing for a proposal within the next 2 slots.
+// This is used by sync service to avoid interfering with proposer preparation.
+func (s *Service) IsPreparingForProposal(ctx context.Context) bool {
+	if s.cfg.ExecutionEngineCaller == nil || !params.FuluEnabled() {
+		return false
+	}
+
+	s.headLock.RLock()
+	headState := s.headState(ctx)
+	currentSlot := s.CurrentSlot()
+	s.headLock.RUnlock()
+
+	// Check if we are proposing within the next 2 slots
+	for i := primitives.Slot(1); i <= 2; i++ {
+		upcomingSlot := currentSlot + i
+		_, isProposer := s.trackedProposer(headState, upcomingSlot)
+		if isProposer {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ShouldSkipCustodyChange checks if custody changes should be skipped due to proposer preparation.
+// This is called by sync service to avoid interfering with proposer preparation.
+func (s *Service) ShouldSkipCustodyChange(ctx context.Context) bool {
+	// If we are preparing for proposal, skip custody changes
+	return s.IsPreparingForProposal(ctx)
 }

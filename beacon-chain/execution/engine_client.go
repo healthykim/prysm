@@ -47,6 +47,7 @@ var (
 		GetPayloadBodiesByHashV1,
 		GetPayloadBodiesByRangeV1,
 		GetBlobsV1,
+		BlobCustodyUpdatedV1,
 	}
 
 	electraEngineEndpoints = []string{
@@ -98,6 +99,8 @@ const (
 	GetBlobsV1 = "engine_getBlobsV1"
 	// GetBlobsV2 request string for JSON-RPC.
 	GetBlobsV2 = "engine_getBlobsV2"
+	// BlobCustodyUpdatedV1 request string for JSON-RPC.
+	BlobCustodyUpdatedV1 = "engine_blobCustodyUpdatedV1"
 	// Defines the seconds before timing out engine endpoints with non-block execution semantics.
 	defaultEngineTimeout = time.Second
 )
@@ -134,6 +137,7 @@ type EngineCaller interface {
 	GetPayload(ctx context.Context, payloadId [8]byte, slot primitives.Slot) (*blocks.GetPayloadResponse, error)
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash, withTxs bool) (*pb.ExecutionBlock, error)
 	GetTerminalBlockHash(ctx context.Context, transitionTime uint64) ([]byte, bool, error)
+	BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uint64) error
 }
 
 var ErrEmptyBlockHash = errors.New("Block hash is empty 0x0000...")
@@ -1009,6 +1013,33 @@ func toBlockNumArg(number *big.Int) string {
 		return "safe"
 	}
 	return hexutil.EncodeBig(number)
+}
+
+// BlobCustodyUpdatedV1 calls the engine_blobCustodyUpdatedV1 method via JSON-RPC.
+func (s *Service) BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uint64) error {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.BlobCustodyUpdatedV1")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		// Add metrics here if needed
+		_ = time.Since(start)
+	}()
+
+	d := time.Now().Add(time.Duration(params.BeaconConfig().ExecutionEngineTimeoutValue) * time.Second)
+	ctx, cancel := context.WithDeadline(ctx, d)
+	defer cancel()
+
+	var result interface{}
+	err := s.rpcClient.CallContext(ctx, &result, BlobCustodyUpdatedV1, custodyColumns)
+	if err != nil {
+		return handleRPCError(err)
+	}
+
+	log.WithFields(logrus.Fields{
+		"custodyColumns": custodyColumns,
+	}).Debug("Successfully called BlobCustodyUpdatedV1")
+
+	return nil
 }
 
 // wrapWithBlockRoot returns a new error with the given block root.

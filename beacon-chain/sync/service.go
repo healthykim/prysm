@@ -124,6 +124,7 @@ type blockchainService interface {
 	blockchain.OptimisticModeFetcher
 	blockchain.SlashingReceiver
 	blockchain.ForkchoiceFetcher
+	ShouldSkipCustodyChange(ctx context.Context) bool
 }
 
 // Service is responsible for handling all run time p2p related operations as the
@@ -277,7 +278,10 @@ func (s *Service) Start() {
 	s.maintainPeerStatuses()
 
 	if params.FuluEnabled() {
+		log.Info("Fulu enabled - starting custody info maintenance")
 		s.maintainCustodyInfo()
+	} else {
+		log.Info("Fulu disabled - skipping custody info maintenance")
 	}
 
 	s.resyncIfBehind()

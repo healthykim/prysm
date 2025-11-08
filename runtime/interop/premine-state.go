@@ -12,6 +12,7 @@ import (
 	fieldparams "github.com/OffchainLabs/prysm/v6/config/fieldparams"
 	"github.com/OffchainLabs/prysm/v6/config/params"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/blocks"
+	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v6/container/trie"
 	"github.com/OffchainLabs/prysm/v6/crypto/bls"
 	"github.com/OffchainLabs/prysm/v6/encoding/bytesutil"
@@ -317,6 +318,9 @@ func (s *PremineGenesisConfig) populate(g state.BeaconState) error {
 		return err
 	}
 	if err := s.setExecutionPayload(g); err != nil {
+		return err
+	}
+	if err := s.setProposerLookahead(g); err != nil {
 		return err
 	}
 
@@ -769,4 +773,25 @@ func nSetRoots(n uint64, r []byte) [][]byte {
 		roots[i] = h
 	}
 	return roots
+}
+
+func (s *PremineGenesisConfig) setProposerLookahead(g state.BeaconState) error {
+	// Only set proposer lookahead for Fulu version
+	if s.Version != version.Fulu {
+		return nil
+	}
+
+	// Initialize proposer lookahead for genesis
+	proposerLookahead, err := helpers.InitializeProposerLookahead(context.Background(), g, 0)
+	if err != nil {
+		return errors.Wrap(err, "could not initialize proposer lookahead")
+	}
+
+	// Convert []uint64 to []primitives.ValidatorIndex
+	lookahead := make([]primitives.ValidatorIndex, len(proposerLookahead))
+	for i, idx := range proposerLookahead {
+		lookahead[i] = primitives.ValidatorIndex(idx)
+	}
+
+	return g.SetProposerLookahead(lookahead)
 }

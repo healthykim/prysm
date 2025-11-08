@@ -47,6 +47,11 @@ func (s *Service) setupExecutionClientConnections(ctx context.Context, currEndpo
 	}
 	s.updateConnectedETH1(true)
 	s.runError = nil
+
+	// Call BlobCustodyUpdatedV1 API when connected to new EL
+	// This will be called from blockchain service when custody info is available
+	log.Info("EL connection established, ready to receive custody updates")
+
 	return nil
 }
 
