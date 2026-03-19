@@ -123,14 +123,14 @@ func (s *Service) updateCustodyInfoIfNeeded() error {
 
 // custodyGroupCount computes the custody group count based on the custody requirement,
 // the validators custody requirement, and whether the node is subscribed to all data subnets.
-func (s *Service) custodyGroupCount(context.Context) (uint64, error) {
+func (s *Service) custodyGroupCount(ctx context.Context) (uint64, error) {
 	cfg := params.BeaconConfig()
 
 	if flags.Get().SubscribeAllDataSubnets {
 		return cfg.NumberOfCustodyGroups, nil
 	}
 
-	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement()
+	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement(ctx)
 	if err != nil {
 		return 0, errors.Wrap(err, "validators custody requirement")
 	}
@@ -145,9 +145,10 @@ func (s *Service) custodyGroupCount(context.Context) (uint64, error) {
 	return result, nil
 }
 
-// validatorsCustodyRequirements computes the custody requirements based on the
-// finalized state and the tracked validators.
-func (s *Service) validatorsCustodyRequirement() (uint64, error) {
+// validatorsCustodyRequirement computes the custody requirements based on the
+// head state and the tracked validators. Using head state instead of finalized
+// state allows earlier detection of custody requirement changes.
+func (s *Service) validatorsCustodyRequirement(ctx context.Context) (uint64, error) {
 	if s.trackedValidatorsCache == nil {
 		return 0, nil
 	}
@@ -159,14 +160,17 @@ func (s *Service) validatorsCustodyRequirement() (uint64, error) {
 		return 0, nil
 	}
 
-	// Retrieve the finalized state.
-	finalizedState := s.cfg.stateGen.FinalizedState()
-	if finalizedState == nil || finalizedState.IsNil() {
-		return 0, nilFinalizedStateError
+	// Retrieve the head state for earlier detection of custody changes.
+	headState, err := s.cfg.chain.HeadStateReadOnly(ctx)
+	if err != nil {
+		return 0, errors.Wrap(err, "head state")
+	}
+	if headState == nil || headState.IsNil() {
+		return 0, errors.New("head state is nil")
 	}
 
 	// Compute the validators custody requirements.
-	result, err := peerdas.ValidatorsCustodyRequirement(finalizedState, indices)
+	result, err := peerdas.ValidatorsCustodyRequirement(headState, indices)
 	if err != nil {
 		return 0, errors.Wrap(err, "validators custody requirements")
 	}
