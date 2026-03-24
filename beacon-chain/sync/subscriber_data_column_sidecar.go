@@ -89,7 +89,7 @@ func (s *Service) receiveDataColumnSidecars(ctx context.Context, sidecars []bloc
 // column sidecars on all subnets. This method returns a nil map when there is no validators custody
 // requirement.
 func (s *Service) allDataColumnSubnets(_ primitives.Slot) map[uint64]bool {
-	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement()
+	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement(s.ctx)
 	if err != nil {
 		log.WithError(err).Error("Could not retrieve validators custody requirement")
 		return nil

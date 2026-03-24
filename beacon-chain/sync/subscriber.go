@@ -702,7 +702,7 @@ func (s *Service) samplingSize() (uint64, error) {
 	}
 
 	// Compute the validators custody requirement.
-	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement()
+	validatorsCustodyRequirement, err := s.validatorsCustodyRequirement(s.ctx)
 	if err != nil {
 		return 0, errors.Wrap(err, "validators custody requirement")
 	}
