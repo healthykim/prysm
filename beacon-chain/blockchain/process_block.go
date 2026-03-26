@@ -1024,28 +1024,38 @@ func (s *Service) manageCustodyForProposer(ctx context.Context, headState state.
 	// Can be configured
 	val, isProposerIn2Slots := s.trackedProposer(headState, currentSlot+2)
 	if isProposerIn2Slots {
-		// 2 slots before proposing: send all custody columns
-		allColumns := make([]uint64, params.BeaconConfig().NumberOfColumns)
-		for j := uint64(0); j < params.BeaconConfig().NumberOfColumns; j++ {
-			allColumns[j] = j
+		// 2 slots before proposing: send data columns (first half) + existing custody columns
+		columnsMap := make(map[uint64]bool)
+
+		// Add data columns (first half: 0 to NumberOfColumns/2 - 1)
+		dataColumnCount := params.BeaconConfig().NumberOfColumns / 2
+		for j := uint64(0); j < dataColumnCount; j++ {
+			columnsMap[j] = true
 		}
 
-		allColumnsMap := make(map[uint64]bool, len(allColumns))
-		for _, col := range allColumns {
-			allColumnsMap[col] = true
+		// Add existing custody columns
+		nodeID := s.cfg.P2P.NodeID()
+		custodyGroupCount, err := s.cfg.P2P.CustodyGroupCount(ctx)
+		if err == nil {
+			peerInfo, _, err := peerdas.Info(nodeID, custodyGroupCount)
+			if err == nil && peerInfo != nil {
+				for col := range peerInfo.CustodyColumns {
+					columnsMap[col] = true
+				}
+			}
 		}
 
-		if err := s.cfg.P2P.NotifyCustodyColumnsChange(ctx, allColumnsMap, s.cfg.ExecutionEngineCaller); err != nil {
+		if err := s.cfg.P2P.NotifyCustodyColumnsChange(ctx, columnsMap, s.cfg.ExecutionEngineCaller); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
 				"proposingSlot": currentSlot + 2,
 				"feeRecipient":  fmt.Sprintf("%#x", val.FeeRecipient),
-			}).Error("Failed to notify all custody columns before proposing")
+			}).Error("Failed to notify custody columns before proposing")
 		} else {
 			log.WithFields(logrus.Fields{
 				"currentSlot":        currentSlot,
 				"proposingSlot":      currentSlot + 2,
-				"custodyColumnCount": len(allColumns),
-			}).Info("Notified all custody columns 2 slots before proposing")
+				"custodyColumnCount": len(columnsMap),
+			}).Info("Notified custody columns (data + existing) before proposing")
 		}
 		return
 	}
