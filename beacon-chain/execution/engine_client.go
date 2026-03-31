@@ -58,6 +58,7 @@ var (
 	fuluEngineEndpoints = []string{
 		GetPayloadMethodV5,
 		GetBlobsV2,
+		GetBlobsV4,
 	}
 )
 
@@ -101,6 +102,8 @@ const (
 	GetBlobsV2 = "engine_getBlobsV2"
 	// BlobCustodyUpdatedV1 request string for JSON-RPC.
 	BlobCustodyUpdatedV1 = "engine_blobCustodyUpdatedV1"
+	// GetBlobsV4 request string for JSON-RPC.
+	GetBlobsV4 = "engine_getBlobsV4"
 	// Defines the seconds before timing out engine endpoints with non-block execution semantics.
 	defaultEngineTimeout = time.Second
 )
@@ -124,7 +127,7 @@ type Reconstructor interface {
 		ctx context.Context, blindedBlocks []interfaces.ReadOnlySignedBeaconBlock,
 	) ([]interfaces.SignedBeaconBlock, error)
 	ReconstructBlobSidecars(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock, blockRoot [fieldparams.RootLength]byte, hi func(uint64) bool) ([]blocks.VerifiedROBlob, error)
-	ConstructDataColumnSidecars(ctx context.Context, populator peerdas.ConstructionPopulator) ([]blocks.VerifiedRODataColumn, error)
+	ConstructDataColumnSidecars(ctx context.Context, populator peerdas.ConstructionPopulator, custodyColumns map[uint64]bool) ([]blocks.VerifiedRODataColumn, error)
 }
 
 // EngineCaller defines a client that can interact with an Ethereum
@@ -138,6 +141,7 @@ type EngineCaller interface {
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash, withTxs bool) (*pb.ExecutionBlock, error)
 	GetTerminalBlockHash(ctx context.Context, transitionTime uint64) ([]byte, bool, error)
 	BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uint64) error
+	GetBlobsV4(ctx context.Context, versionedHashes []common.Hash, indicesBitarray []byte) ([]*pb.BlobCellsAndProofsV1, error)
 }
 
 var ErrEmptyBlockHash = errors.New("Block hash is empty 0x0000...")
@@ -655,7 +659,7 @@ func (s *Service) ReconstructBlobSidecars(ctx context.Context, block interfaces.
 	return verifiedBlobs, nil
 }
 
-func (s *Service) ConstructDataColumnSidecars(ctx context.Context, populator peerdas.ConstructionPopulator) ([]blocks.VerifiedRODataColumn, error) {
+func (s *Service) ConstructDataColumnSidecars(ctx context.Context, populator peerdas.ConstructionPopulator, custodyColumns map[uint64]bool) ([]blocks.VerifiedRODataColumn, error) {
 	root := populator.Root()
 
 	// Fetch cells and proofs from the execution client using the KZG commitments from the sidecar.
@@ -664,7 +668,7 @@ func (s *Service) ConstructDataColumnSidecars(ctx context.Context, populator pee
 		return nil, wrapWithBlockRoot(err, root, "commitments")
 	}
 
-	cellsAndProofs, err := s.fetchCellsAndProofsFromExecution(ctx, commitments)
+	cellsAndProofs, err := s.fetchCellsAndProofsFromExecution(ctx, commitments, custodyColumns)
 	if err != nil {
 		return nil, wrapWithBlockRoot(err, root, "fetch cells and proofs from execution client")
 	}
@@ -687,8 +691,9 @@ func (s *Service) ConstructDataColumnSidecars(ctx context.Context, populator pee
 	return verifiedROSidecars, nil
 }
 
-// fetchCellsAndProofsFromExecution fetches cells and proofs from the execution client (using engine_getBlobsV2 execution API method)
-func (s *Service) fetchCellsAndProofsFromExecution(ctx context.Context, kzgCommitments [][]byte) ([]kzg.CellsAndProofs, error) {
+// fetchCellsAndProofsFromExecution fetches cells and proofs from the execution client.
+// It uses engine_getBlobsV4 if available, falling back to engine_getBlobsV2.
+func (s *Service) fetchCellsAndProofsFromExecution(ctx context.Context, kzgCommitments [][]byte, custodyColumns map[uint64]bool) ([]kzg.CellsAndProofs, error) {
 	// Collect KZG hashes for all blobs.
 	versionedHashes := make([]common.Hash, 0, len(kzgCommitments))
 	for _, commitment := range kzgCommitments {
@@ -696,18 +701,113 @@ func (s *Service) fetchCellsAndProofsFromExecution(ctx context.Context, kzgCommi
 		versionedHashes = append(versionedHashes, versionedHash)
 	}
 
-	// Fetch all blobsAndCellsProofs from the execution client.
+	// Try V4 first (returns cells and proofs directly).
+	if s.capabilityCache.has(GetBlobsV4) {
+		return s.fetchCellsAndProofsV4(ctx, versionedHashes, custodyColumns)
+	}
+
+	// Fallback to V2 (returns blobs + cell proofs, needs cell computation).
+	return s.fetchCellsAndProofsV2(ctx, versionedHashes)
+}
+
+// fetchCellsAndProofsV4 fetches cells and proofs using engine_getBlobsV4.
+func (s *Service) fetchCellsAndProofsV4(ctx context.Context, versionedHashes []common.Hash, custodyColumns map[uint64]bool) ([]kzg.CellsAndProofs, error) {
+	numberOfColumns := params.BeaconConfig().NumberOfColumns
+
+	// Build bitarray from custody column indices (16 bytes = 128 bits).
+	indicesBitarray := make([]byte, 16)
+	for colIdx := range custodyColumns {
+		if colIdx < numberOfColumns {
+			indicesBitarray[colIdx/8] |= 1 << (colIdx % 8)
+		}
+	}
+
+	log.WithFields(logrus.Fields{
+		"blobCount": len(versionedHashes),
+		"cellBits":  fmt.Sprintf("%x", indicesBitarray),
+	}).Info("Requesting cells and proofs via getBlobsV4")
+
+	result, err := s.GetBlobsV4(ctx, versionedHashes, indicesBitarray)
+	if err != nil {
+		return nil, errors.Wrapf(err, "get blobs V4")
+	}
+
+	if len(result) == 0 {
+		log.Info("GetBlobsV4 returned empty result")
+		return nil, nil
+	}
+
+	// Count available vs null responses
+	availableCount := 0
+	nullCount := 0
+	for _, blobCells := range result {
+		if blobCells == nil {
+			nullCount++
+		} else {
+			availableCount++
+		}
+	}
+
+	log.WithFields(logrus.Fields{
+		"requested": len(versionedHashes),
+		"available": availableCount,
+		"null":      nullCount,
+	}).Info("GetBlobsV4 response received")
+
+	cellsAndProofs := make([]kzg.CellsAndProofs, 0, len(result))
+	for i, blobCells := range result {
+		if blobCells == nil {
+			log.WithField("blobIndex", i).Warn("GetBlobsV4: blob not available from EL")
+			return nil, fmt.Errorf("blob at index %d not available from EL", i)
+		}
+
+		cellCount := 0
+		nullCellCount := 0
+		for _, c := range blobCells.BlobCells {
+			if c != nil {
+				cellCount++
+			} else {
+				nullCellCount++
+			}
+		}
+
+		log.WithFields(logrus.Fields{
+			"blobIndex":     i,
+			"totalCells":    len(blobCells.BlobCells),
+			"availableCells": cellCount,
+			"nullCells":     nullCellCount,
+			"totalProofs":   len(blobCells.Proofs),
+		}).Info("GetBlobsV4: blob cells detail")
+
+		cells := make([]kzg.Cell, numberOfColumns)
+		proofs := make([]kzg.Proof, numberOfColumns)
+
+		for j := uint64(0); j < numberOfColumns; j++ {
+			if j < uint64(len(blobCells.BlobCells)) && blobCells.BlobCells[j] != nil {
+				copy(cells[j][:], *blobCells.BlobCells[j])
+			}
+			if j < uint64(len(blobCells.Proofs)) && blobCells.Proofs[j] != nil {
+				copy(proofs[j][:], *blobCells.Proofs[j])
+			}
+		}
+
+		cellsAndProofs = append(cellsAndProofs, kzg.CellsAndProofs{Cells: cells, Proofs: proofs})
+	}
+
+	return cellsAndProofs, nil
+}
+
+// fetchCellsAndProofsV2 fetches cells and proofs using engine_getBlobsV2 (legacy fallback).
+func (s *Service) fetchCellsAndProofsV2(ctx context.Context, versionedHashes []common.Hash) ([]kzg.CellsAndProofs, error) {
 	blobAndProofV2s, err := s.GetBlobsV2(ctx, versionedHashes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "get blobs V2")
 	}
 
-	// Return early if nothing is returned from the EL.
 	if len(blobAndProofV2s) == 0 {
 		return nil, nil
 	}
 
-	// Compute cells and proofs from the blobs and cell proofs.
 	cellsAndProofs, err := peerdas.ComputeCellsAndProofsFromStructured(blobAndProofV2s)
 	if err != nil {
 		return nil, errors.Wrap(err, "compute cells and proofs")
@@ -1040,6 +1140,22 @@ func (s *Service) BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uin
 	}).Debug("Successfully called BlobCustodyUpdatedV1")
 
 	return nil
+}
+
+// GetBlobsV4 calls the engine_getBlobsV4 method via JSON-RPC.
+// It fetches blob cells and KZG proofs for the given versioned hashes
+// and the bitarray of custody bitmap
+func (s *Service) GetBlobsV4(ctx context.Context, versionedHashes []common.Hash, indicesBitarray []byte) ([]*pb.BlobCellsAndProofsV1, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetBlobsV4")
+	defer span.End()
+
+	if !s.capabilityCache.has(GetBlobsV4) {
+		return nil, errors.New(fmt.Sprintf("%s is not supported", GetBlobsV4))
+	}
+
+	result := make([]*pb.BlobCellsAndProofsV1, len(versionedHashes))
+	err := s.rpcClient.CallContext(ctx, &result, GetBlobsV4, versionedHashes, hexutil.Bytes(indicesBitarray))
+	return result, handleRPCError(err)
 }
 
 // wrapWithBlockRoot returns a new error with the given block root.

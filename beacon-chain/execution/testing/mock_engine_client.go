@@ -118,7 +118,7 @@ func (e *EngineClient) ReconstructBlobSidecars(context.Context, interfaces.ReadO
 }
 
 // ConstructDataColumnSidecars is a mock implementation of the ConstructDataColumnSidecars method.
-func (e *EngineClient) ConstructDataColumnSidecars(context.Context, peerdas.ConstructionPopulator) ([]blocks.VerifiedRODataColumn, error) {
+func (e *EngineClient) ConstructDataColumnSidecars(context.Context, peerdas.ConstructionPopulator, map[uint64]bool) ([]blocks.VerifiedRODataColumn, error) {
 	return e.DataColumnSidecars, e.ErrorDataColumnSidecars
 }
 
