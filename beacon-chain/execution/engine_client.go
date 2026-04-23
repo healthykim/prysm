@@ -714,11 +714,13 @@ func (s *Service) fetchCellsAndProofsFromExecution(ctx context.Context, kzgCommi
 func (s *Service) fetchCellsAndProofsV4(ctx context.Context, versionedHashes []common.Hash, custodyColumns map[uint64]bool) ([]kzg.CellsAndProofs, error) {
 	numberOfColumns := params.BeaconConfig().NumberOfColumns
 
-	// Build bitarray from custody column indices (16 bytes = 128 bits).
+	// Build 16-byte big-endian uint128 bitarray from custody column indices.
+	// Column i corresponds to bit i of the uint128 (LSB = column 0).
+	// In big-endian byte order, bit 0 is in the last byte.
 	indicesBitarray := make([]byte, 16)
 	for colIdx := range custodyColumns {
 		if colIdx < numberOfColumns {
-			indicesBitarray[colIdx/8] |= 1 << (colIdx % 8)
+			indicesBitarray[15-(colIdx/8)] |= 1 << (colIdx % 8)
 		}
 	}
 
@@ -1116,6 +1118,8 @@ func toBlockNumArg(number *big.Int) string {
 }
 
 // BlobCustodyUpdatedV1 calls the engine_blobCustodyUpdatedV1 method via JSON-RPC.
+// It converts the custody column indices into a 16-byte (uint128) bitarray of length
+// CELLS_PER_EXT_BLOB (NumberOfColumns) as required by the engine API spec.
 func (s *Service) BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uint64) error {
 	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.BlobCustodyUpdatedV1")
 	defer span.End()
@@ -1129,14 +1133,26 @@ func (s *Service) BlobCustodyUpdatedV1(ctx context.Context, custodyColumns []uin
 	ctx, cancel := context.WithDeadline(ctx, d)
 	defer cancel()
 
+	// Build 16-byte big-endian uint128 bitarray from custody column indices.
+	// Column i corresponds to bit i of the uint128 (LSB = column 0).
+	// In big-endian byte order, bit 0 is in the last byte.
+	numberOfColumns := params.BeaconConfig().NumberOfColumns
+	indicesBitarray := make([]byte, 16)
+	for _, colIdx := range custodyColumns {
+		if colIdx < numberOfColumns {
+			indicesBitarray[15-(colIdx/8)] |= 1 << (colIdx % 8)
+		}
+	}
+
 	var result interface{}
-	err := s.rpcClient.CallContext(ctx, &result, BlobCustodyUpdatedV1, custodyColumns)
+	err := s.rpcClient.CallContext(ctx, &result, BlobCustodyUpdatedV1, hexutil.Bytes(indicesBitarray))
 	if err != nil {
 		return handleRPCError(err)
 	}
 
 	log.WithFields(logrus.Fields{
-		"custodyColumns": custodyColumns,
+		"custodyColumnCount": len(custodyColumns),
+		"bitarray":           fmt.Sprintf("%x", indicesBitarray),
 	}).Debug("Successfully called BlobCustodyUpdatedV1")
 
 	return nil
